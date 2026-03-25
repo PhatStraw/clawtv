@@ -282,8 +282,15 @@ async function cmdSetup() {
 }
 
 function cmdScreenshot() {
-  adb("shell screencap -p /sdcard/_clawtv.png");
-  adb(`pull /sdcard/_clawtv.png "${SCREEN_PATH}"`);
+  const capResult = adb("shell screencap -p /sdcard/_clawtv.png");
+  const pullResult = adb(`pull /sdcard/_clawtv.png "${SCREEN_PATH}"`);
+  if (!fs.existsSync(SCREEN_PATH)) {
+    console.error("❌ Screenshot failed — file was not created.");
+    console.error(`   screencap: ${capResult.trim()}`);
+    console.error(`   pull: ${pullResult.trim()}`);
+    console.error("   Is the TV connected? Try: clawtv setup");
+    process.exit(1);
+  }
   const size = fs.statSync(SCREEN_PATH).size;
   console.log(`Screenshot saved: ${SCREEN_PATH}`);
   console.log(`Size: ${size} bytes`);
