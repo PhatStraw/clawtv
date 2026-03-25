@@ -31,7 +31,7 @@ install in 2 commands:
 npm install -g clawtv
 
 then in claude code:
-/skills install https://raw.githubusercontent.com/YOUR_USERNAME/clawtv/main/skill.md
+/skills install https://raw.githubusercontent.com/phatstraw/clawtv/main/skill.md
 
 then just talk:
 > "find inception on netflix and pause on play"
@@ -59,7 +59,7 @@ works on any android tv:
 TCL ✓  Sony ✓  Hisense ✓  Chromecast with Google TV ✓
 
 open source, MIT license
-github: https://github.com/YOUR_USERNAME/clawtv
+github: https://github.com/phatstraw/clawtv
 
 ---
 
@@ -71,5 +71,5 @@ gave claude code a tv remote
 
 [VIDEO]
 
-github: https://github.com/YOUR_USERNAME/clawtv
+github: https://github.com/phatstraw/clawtv
 npm install -g clawtv

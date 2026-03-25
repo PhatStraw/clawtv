@@ -49,7 +49,7 @@ clawtv connect
 
 **Step 3 — Install the skill in Claude Code:**
 ```
-/skills install https://raw.githubusercontent.com/YOUR_USERNAME/clawtv/main/skill.md
+/skills install https://raw.githubusercontent.com/phatstraw/clawtv/main/skill.md
 ```
 
 **Step 4 — Start Claude Code in any directory and talk to your TV:**

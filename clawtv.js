@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * clawtv — ADB tool executor for Claude Code
- * https://github.com/YOUR_USERNAME/clawtv
+ * https://github.com/phatstraw/clawtv
  *
  * Claude Code reads the skill and calls this CLI directly.
  * No API keys. No config files. Just ADB + Claude Code.
@@ -26,7 +26,7 @@ const os = require("os");
 const path = require("path");
 
 // ── Config ─────────────────────────────────────────────────────────────────
-const TV_IP   = process.env.CLAWTV_IP   || process.env.TV_IP   || null;
+const TV_IP = process.env.CLAWTV_IP || process.env.TV_IP || null;
 const TV_PORT = process.env.CLAWTV_PORT || process.env.TV_PORT || "5555";
 const SCREEN_PATH = path.join(os.homedir(), ".clawtv", "screen.png");
 
@@ -35,32 +35,58 @@ fs.mkdirSync(path.dirname(SCREEN_PATH), { recursive: true });
 
 // ── Known apps ─────────────────────────────────────────────────────────────
 const KNOWN_APPS = {
-  "apple tv":    { pkg: "com.apple.atve.androidtv.appletv",       activity: "com.apple.atve.androidtv.appletv/.MainActivity" },
-  "netflix":     { pkg: "com.netflix.ninja",                       activity: "com.netflix.ninja/.MainActivity" },
-  "youtube":     { pkg: "com.google.android.youtube.tv",           activity: "com.google.android.youtube.tv/com.google.android.apps.youtube.tv.activity.ShellActivity" },
-  "hulu":        { pkg: "com.hulu.livingroom",                     activity: null },
-  "disney+":     { pkg: "com.disney.disneyplus",                   activity: null },
-  "disney plus": { pkg: "com.disney.disneyplus",                   activity: null },
-  "max":         { pkg: "com.hbo.hbonow",                          activity: null },
-  "hbo":         { pkg: "com.hbo.hbonow",                          activity: null },
-  "amazon":      { pkg: "com.amazon.amazonvideo.livingroom",        activity: null },
-  "prime":       { pkg: "com.amazon.amazonvideo.livingroom",        activity: null },
-  "plex":        { pkg: "com.plexapp.android",                     activity: null },
-  "spotify":     { pkg: "com.spotify.tv.android",                  activity: null },
-  "peacock":     { pkg: "com.peacocktv.peacockandroid",            activity: null },
-  "paramount":   { pkg: "com.cbs.ott",                             activity: null },
-  "settings":    { pkg: "com.android.tv.settings",                 activity: null },
+  "apple tv": {
+    pkg: "com.apple.atve.androidtv.appletv",
+    activity: "com.apple.atve.androidtv.appletv/.MainActivity",
+  },
+  netflix: {
+    pkg: "com.netflix.ninja",
+    activity: "com.netflix.ninja/.MainActivity",
+  },
+  youtube: {
+    pkg: "com.google.android.youtube.tv",
+    activity:
+      "com.google.android.youtube.tv/com.google.android.apps.youtube.tv.activity.ShellActivity",
+  },
+  hulu: { pkg: "com.hulu.livingroom", activity: null },
+  "disney+": { pkg: "com.disney.disneyplus", activity: null },
+  "disney plus": { pkg: "com.disney.disneyplus", activity: null },
+  max: { pkg: "com.hbo.hbonow", activity: null },
+  hbo: { pkg: "com.hbo.hbonow", activity: null },
+  amazon: { pkg: "com.amazon.amazonvideo.livingroom", activity: null },
+  prime: { pkg: "com.amazon.amazonvideo.livingroom", activity: null },
+  plex: { pkg: "com.plexapp.android", activity: null },
+  spotify: { pkg: "com.spotify.tv.android", activity: null },
+  peacock: { pkg: "com.peacocktv.peacockandroid", activity: null },
+  paramount: { pkg: "com.cbs.ott", activity: null },
+  settings: { pkg: "com.android.tv.settings", activity: null },
 };
 
 const KEY_MAP = {
-  up: 19, down: 20, left: 21, right: 22,
-  select: 23, enter: 23, ok: 23,
-  back: 4, home: 3, menu: 82,
-  play: 85, pause: 85, playpause: 85,
-  stop: 86, next: 87, previous: 88,
-  rewind: 89, fastforward: 90,
-  volume_up: 24, volume_down: 25, mute: 164,
-  power: 26, sleep: 223, wake: 224,
+  up: 19,
+  down: 20,
+  left: 21,
+  right: 22,
+  select: 23,
+  enter: 23,
+  ok: 23,
+  back: 4,
+  home: 3,
+  menu: 82,
+  play: 85,
+  pause: 85,
+  playpause: 85,
+  stop: 86,
+  next: 87,
+  previous: 88,
+  rewind: 89,
+  fastforward: 90,
+  volume_up: 24,
+  volume_down: 25,
+  mute: 164,
+  power: 26,
+  sleep: 223,
+  wake: 224,
 };
 
 // ── ADB helpers ────────────────────────────────────────────────────────────
@@ -68,7 +94,9 @@ function getTarget() {
   if (!TV_IP) {
     // Try to find a connected device automatically
     const out = adbRaw("devices");
-    const lines = out.split("\n").filter(l => l.includes(":5555") && l.includes("device"));
+    const lines = out
+      .split("\n")
+      .filter((l) => l.includes(":5555") && l.includes("device"));
     if (lines.length > 0) {
       return lines[0].split("\t")[0].trim();
     }
@@ -80,7 +108,10 @@ function getTarget() {
 
 function adbRaw(cmd) {
   try {
-    return execSync(`adb ${cmd}`, { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] });
+    return execSync(`adb ${cmd}`, {
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
   } catch (e) {
     return (e.stdout || "") + (e.stderr || "");
   }
@@ -89,14 +120,19 @@ function adbRaw(cmd) {
 function adb(cmd) {
   const target = getTarget();
   try {
-    return execSync(`adb -s ${target} ${cmd}`, { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] });
+    return execSync(`adb -s ${target} ${cmd}`, {
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
   } catch (e) {
     return (e.stdout || "") + (e.stderr || "");
   }
 }
 
 function resolveActivity(pkg) {
-  const out = adb(`shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LEANBACK_LAUNCHER ${pkg}`);
+  const out = adb(
+    `shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LEANBACK_LAUNCHER ${pkg}`,
+  );
   for (const line of out.split("\n")) {
     if (line.includes("/") && !line.startsWith("priority")) return line.trim();
   }
@@ -104,7 +140,7 @@ function resolveActivity(pkg) {
 }
 
 function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // ── Commands ───────────────────────────────────────────────────────────────
@@ -144,13 +180,19 @@ function cmdScan() {
     for (let i = 1; i <= 254; i++) {
       const ip = `${subnet}.${i}`;
       const out = adbRaw(`connect ${ip}:5555`);
-      if (out.includes("connected") && !out.includes("failed") && !out.includes("refused")) {
+      if (
+        out.includes("connected") &&
+        !out.includes("failed") &&
+        !out.includes("refused")
+      ) {
         console.log(`✅ Found TV at: ${ip}`);
         found.push(ip);
       }
     }
     if (found.length === 0) {
-      console.log("No devices found. Make sure ADB debugging is enabled on your TV.");
+      console.log(
+        "No devices found. Make sure ADB debugging is enabled on your TV.",
+      );
       console.log("Settings → Developer Options → Network Debugging → ON");
     } else {
       console.log(`\nAdd to your shell profile:`);
@@ -172,9 +214,9 @@ function cmdScreenshot() {
 }
 
 function cmdPress(args) {
-  const key   = (args[0] || "select").toLowerCase().replace(/\s+/g, "_");
+  const key = (args[0] || "select").toLowerCase().replace(/\s+/g, "_");
   const times = parseInt(args[1] || "1", 10);
-  const code  = KEY_MAP[key] !== undefined ? KEY_MAP[key] : key;
+  const code = KEY_MAP[key] !== undefined ? KEY_MAP[key] : key;
   for (let i = 0; i < times; i++) {
     adb(`shell input keyevent ${code}`);
     if (times > 1 && i < times - 1) execSync("sleep 0.15");
@@ -196,7 +238,9 @@ function cmdLaunch(args) {
       const out = adb(`shell am start -n ${activity}`);
       console.log(out.trim() || `Launched ${appName}`);
     } else {
-      const out = adb(`shell am start -a android.intent.action.MAIN -c android.intent.category.LEANBACK_LAUNCHER -p ${known.pkg}`);
+      const out = adb(
+        `shell am start -a android.intent.action.MAIN -c android.intent.category.LEANBACK_LAUNCHER -p ${known.pkg}`,
+      );
       console.log(out.trim() || `Launched ${appName}`);
     }
   } else {
@@ -212,7 +256,8 @@ function cmdLaunch(args) {
 }
 
 function cmdType(args) {
-  const text = args.join(" ")
+  const text = args
+    .join(" ")
     .replace(/ /g, "%s")
     .replace(/'/g, "\\'")
     .replace(/&/g, "\\&")
@@ -223,7 +268,7 @@ function cmdType(args) {
 
 function cmdVolume(args) {
   const action = (args[0] || "up").toLowerCase();
-  const steps  = parseInt(args[1] || "3", 10);
+  const steps = parseInt(args[1] || "3", 10);
   if (action === "mute") {
     adb("shell input keyevent 164");
     console.log("Muted");
@@ -251,8 +296,12 @@ function cmdWait(args) {
 }
 
 function cmdState() {
-  const focus = adb("shell dumpsys window windows | grep -E 'mCurrentFocus|mFocusedApp' | head -5");
-  const media = adb("shell dumpsys media_session | grep -A3 'state=' | head -20");
+  const focus = adb(
+    "shell dumpsys window windows | grep -E 'mCurrentFocus|mFocusedApp' | head -5",
+  );
+  const media = adb(
+    "shell dumpsys media_session | grep -A3 'state=' | head -20",
+  );
   console.log("=== Current focus ===");
   console.log(focus.trim() || "unknown");
   console.log("=== Media state ===");
@@ -288,31 +337,35 @@ Known apps:
 Setup:
   export CLAWTV_IP=<your-tv-ip>    (add to ~/.zshrc)
 
-Docs: https://github.com/YOUR_USERNAME/clawtv
+Docs: https://github.com/phatstraw/clawtv
 `);
 }
 
 // ── Router ─────────────────────────────────────────────────────────────────
-const [,, cmd, ...args] = process.argv;
+const [, , cmd, ...args] = process.argv;
 
 const COMMANDS = {
-  scan:       () => cmdScan(),
-  connect:    () => cmdConnect(),
+  scan: () => cmdScan(),
+  connect: () => cmdConnect(),
   screenshot: () => cmdScreenshot(),
-  screen:     () => cmdScreenshot(),
-  press:      () => cmdPress(args),
-  launch:     () => cmdLaunch(args),
-  open:       () => cmdLaunch(args),
-  type:       () => cmdType(args),
-  text:       () => cmdType(args),
-  volume:     () => cmdVolume(args),
-  vol:        () => cmdVolume(args),
-  power:      () => cmdPower(args),
-  push:       () => { /* TODO: implement push in node */ console.log("Use: adb push <file> /sdcard/Movies/"); },
-  wait:       () => cmdWait(args),
-  state:      () => cmdState(),
-  status:     () => cmdState(),
-  help:       () => cmdHelp(),
+  screen: () => cmdScreenshot(),
+  press: () => cmdPress(args),
+  launch: () => cmdLaunch(args),
+  open: () => cmdLaunch(args),
+  type: () => cmdType(args),
+  text: () => cmdType(args),
+  volume: () => cmdVolume(args),
+  vol: () => cmdVolume(args),
+  power: () => cmdPower(args),
+  push: () => {
+    /* TODO: implement push in node */ console.log(
+      "Use: adb push <file> /sdcard/Movies/",
+    );
+  },
+  wait: () => cmdWait(args),
+  state: () => cmdState(),
+  status: () => cmdState(),
+  help: () => cmdHelp(),
 };
 
 if (!cmd || cmd === "--help" || cmd === "-h") {
