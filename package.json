@@ -1,6 +1,6 @@
 {
   "name": "clawtv",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Control your Android TV with Claude Code. Stop Googling what app your show is on.",
   "bin": {
     "clawtv": "./clawtv.js"
