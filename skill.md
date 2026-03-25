@@ -1,3 +1,23 @@
+---
+name: clawtv
+description: Control any Android TV with ADB — launch apps, navigate UI, find shows, and manage playback via the clawtv CLI
+triggers:
+  - watch
+  - tv
+  - television
+  - netflix
+  - hulu
+  - apple tv
+  - disney+
+  - youtube
+  - put on
+  - play on tv
+  - find on tv
+  - volume
+  - remote
+  - android tv
+---
+
 # clawtv skill
 
 You can control any Android TV using the `clawtv` CLI.

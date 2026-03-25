@@ -48,8 +48,8 @@ clawtv connect
 ```
 
 **Step 3 — Install the skill in Claude Code:**
-```
-/skills install https://raw.githubusercontent.com/phatstraw/clawtv/main/skill.md
+```bash
+npx skills add phatstraw/clawtv
 ```
 
 **Step 4 — Start Claude Code in any directory and talk to your TV:**
@@ -125,7 +125,7 @@ adb -s <tv-ip>:5555 shell pm list packages | grep <appname>
 
 ## Contributing
 
-PRs welcome. The skill file (`skill.md`) is where the intelligence lives — improvements to navigation patterns, new app support, and edge case handling are all valuable.
+PRs welcome. The skill file (`SKILL.md`) is where the intelligence lives — improvements to navigation patterns, new app support, and edge case handling are all valuable.
 
 ---
 
