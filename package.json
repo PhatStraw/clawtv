@@ -1,0 +1,29 @@
+{
+  "name": "clawtv",
+  "version": "1.0.0",
+  "description": "Control your Android TV with Claude Code. Stop Googling what app your show is on.",
+  "bin": {
+    "clawtv": "./bin/clawtv.js"
+  },
+  "scripts": {
+    "test": "node bin/clawtv.js state"
+  },
+  "keywords": [
+    "android-tv",
+    "adb",
+    "claude",
+    "claude-code",
+    "tv-remote",
+    "automation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/clawtv"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {}
+}
