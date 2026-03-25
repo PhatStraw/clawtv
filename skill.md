@@ -40,6 +40,7 @@ Use this skill whenever the user wants to:
 ## All commands
 
 ```bash
+clawtv setup                   # Auto-find TV and save config (one-time)
 clawtv screenshot              # Capture screen → ~/.clawtv/screen.png (READ THIS after every navigation)
 clawtv press <key> [times]     # Remote button
 clawtv launch <app>            # Open app by name
@@ -102,6 +103,12 @@ The top nav in Apple TV has: Search (magnifier) | Home | Library | Store
 ```bash
 clawtv power on
 clawtv wait 2
+clawtv screenshot
+```
+
+### If no TV is configured
+```bash
+clawtv setup
 clawtv screenshot
 ```
 

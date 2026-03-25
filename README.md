@@ -40,11 +40,9 @@ No API keys. No cloud. No subscription. Just Claude Code + your TV on the same W
 npm install -g clawtv
 ```
 
-**Step 2 — Find your TV and connect:**
+**Step 2 — Find and save your TV (one time):**
 ```bash
-clawtv scan          # finds your TV on the network
-export CLAWTV_IP=<your-tv-ip>   # add this to ~/.zshrc
-clawtv connect
+clawtv setup          # auto-finds your TV and saves to ~/.clawtv/config.json
 ```
 
 **Step 3 — Install the skill in Claude Code:**
@@ -77,7 +75,7 @@ claude
 1. **Settings → About → Android TV OS Build** — tap 7 times rapidly
 2. You'll see *"You are now a developer"*
 3. **Settings → Developer Options → Network Debugging → ON**
-4. Run `clawtv scan` to find your TV's IP
+4. Run `clawtv setup` to find and save your TV's IP
 
 ---
 
@@ -114,11 +112,15 @@ adb -s <tv-ip>:5555 shell pm list packages | grep <appname>
 
 ---
 
-## Environment variables
+## Configuration
+
+clawtv looks for your TV in this order:
+1. `CLAWTV_IP` / `CLAWTV_PORT` environment variables (override)
+2. `~/.clawtv/config.json` (created by `clawtv setup`)
 
 | Variable | Description |
 |---|---|
-| `CLAWTV_IP` | Your TV's local IP address |
+| `CLAWTV_IP` | Your TV's local IP address (overrides config file) |
 | `CLAWTV_PORT` | ADB port (default: 5555) |
 
 ---

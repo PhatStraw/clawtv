@@ -7,6 +7,9 @@
  * No API keys. No config files. Just ADB + Claude Code.
  *
  * Commands:
+ *   clawtv setup             ← auto-finds your TV and saves config
+ *   clawtv scan              ← finds your TV on the network
+ *   clawtv connect
  *   clawtv screenshot
  *   clawtv press <key> [times]
  *   clawtv launch <app>
@@ -16,22 +19,40 @@
  *   clawtv push <local_path> [remote_path]
  *   clawtv wait [seconds]
  *   clawtv state
- *   clawtv connect
- *   clawtv scan              ← finds your TV on the network
  */
 
 const { execSync, spawnSync } = require("child_process");
+const net = require("net");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
 // ── Config ─────────────────────────────────────────────────────────────────
-const TV_IP = process.env.CLAWTV_IP || process.env.TV_IP || null;
-const TV_PORT = process.env.CLAWTV_PORT || process.env.TV_PORT || "5555";
-const SCREEN_PATH = path.join(os.homedir(), ".clawtv", "screen.png");
+const CONFIG_DIR = path.join(os.homedir(), ".clawtv");
+const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
+const SCREEN_PATH = path.join(CONFIG_DIR, "screen.png");
 
 // Ensure ~/.clawtv dir exists
-fs.mkdirSync(path.dirname(SCREEN_PATH), { recursive: true });
+fs.mkdirSync(CONFIG_DIR, { recursive: true });
+
+// Load saved config (if any)
+function loadConfig() {
+  try {
+    return JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+function saveConfig(ip, port) {
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify({ ip, port }, null, 2) + "\n");
+}
+
+const savedConfig = loadConfig();
+
+// Resolution: env vars override config file (backward compat)
+const TV_IP = process.env.CLAWTV_IP || process.env.TV_IP || savedConfig.ip || null;
+const TV_PORT = process.env.CLAWTV_PORT || process.env.TV_PORT || savedConfig.port || "5555";
 
 // ── Known apps ─────────────────────────────────────────────────────────────
 const KNOWN_APPS = {
@@ -100,7 +121,7 @@ function getTarget() {
     if (lines.length > 0) {
       return lines[0].split("\t")[0].trim();
     }
-    console.error("❌ No TV found. Set CLAWTV_IP or run: clawtv scan");
+    console.error("❌ No TV found. Run: clawtv setup");
     process.exit(1);
   }
   return `${TV_IP}:${TV_PORT}`;
@@ -143,10 +164,52 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// ── Network scan helpers ──────────────────────────────────────────────────
+function getLocalSubnet() {
+  const ifaces = os.networkInterfaces();
+  for (const iface of Object.values(ifaces)) {
+    for (const addr of iface) {
+      if (addr.family === "IPv4" && !addr.internal) {
+        const parts = addr.address.split(".");
+        return `${parts[0]}.${parts[1]}.${parts[2]}`;
+      }
+    }
+  }
+  return null;
+}
+
+function fastScan(subnet) {
+  return new Promise((resolve) => {
+    const found = [];
+    let pending = 254;
+
+    for (let i = 1; i <= 254; i++) {
+      const ip = `${subnet}.${i}`;
+      const sock = net.connect({ host: ip, port: 5555, timeout: 1000 });
+
+      sock.on("connect", () => {
+        found.push(ip);
+        sock.destroy();
+      });
+
+      sock.on("timeout", () => {
+        sock.destroy();
+      });
+
+      sock.on("error", () => {});
+
+      sock.on("close", () => {
+        pending--;
+        if (pending === 0) resolve(found);
+      });
+    }
+  });
+}
+
 // ── Commands ───────────────────────────────────────────────────────────────
 function cmdConnect() {
   if (!TV_IP) {
-    console.log("No CLAWTV_IP set. Run: clawtv scan");
+    console.log("No CLAWTV_IP set. Run: clawtv setup");
     return;
   }
   const target = `${TV_IP}:${TV_PORT}`;
@@ -155,52 +218,67 @@ function cmdConnect() {
   console.log(out.trim());
 }
 
-function cmdScan() {
+async function cmdScan() {
   console.log("Scanning network for Android TV devices on port 5555...");
-  // Get local subnet
-  try {
-    const ifaces = os.networkInterfaces();
-    const subnets = [];
-    for (const iface of Object.values(ifaces)) {
-      for (const addr of iface) {
-        if (addr.family === "IPv4" && !addr.internal) {
-          const parts = addr.address.split(".");
-          subnets.push(`${parts[0]}.${parts[1]}.${parts[2]}`);
-        }
-      }
-    }
-    if (subnets.length === 0) {
-      console.log("Could not determine local subnet.");
-      return;
-    }
-    const subnet = subnets[0];
-    console.log(`Scanning ${subnet}.0/24 ...`);
-    // Quick port scan using adb connect attempts (fast)
-    const found = [];
-    for (let i = 1; i <= 254; i++) {
-      const ip = `${subnet}.${i}`;
-      const out = adbRaw(`connect ${ip}:5555`);
-      if (
-        out.includes("connected") &&
-        !out.includes("failed") &&
-        !out.includes("refused")
-      ) {
-        console.log(`✅ Found TV at: ${ip}`);
-        found.push(ip);
-      }
-    }
-    if (found.length === 0) {
-      console.log(
-        "No devices found. Make sure ADB debugging is enabled on your TV.",
-      );
-      console.log("Settings → Developer Options → Network Debugging → ON");
-    } else {
-      console.log(`\nAdd to your shell profile:`);
-      console.log(`  export CLAWTV_IP=${found[0]}`);
-    }
-  } catch (e) {
-    console.error("Scan error:", e.message);
+  const subnet = getLocalSubnet();
+  if (!subnet) {
+    console.log("Could not determine local subnet.");
+    return;
   }
+  console.log(`Scanning ${subnet}.0/24 ...`);
+
+  const found = await fastScan(subnet);
+
+  if (found.length === 0) {
+    console.log(
+      "No devices found. Make sure ADB debugging is enabled on your TV.",
+    );
+    console.log("Settings → Developer Options → Network Debugging → ON");
+  } else {
+    for (const ip of found) {
+      console.log(`✅ Found TV at: ${ip}`);
+    }
+    console.log(`\nTo save this config, run: clawtv setup`);
+  }
+}
+
+async function cmdSetup() {
+  console.log("🔍 Scanning network for Android TV devices...");
+
+  const subnet = getLocalSubnet();
+  if (!subnet) {
+    console.error("❌ Could not determine local subnet.");
+    process.exit(1);
+  }
+
+  console.log(`Scanning ${subnet}.0/24 on port 5555...`);
+
+  const found = await fastScan(subnet);
+
+  if (found.length === 0) {
+    console.error("❌ No Android TV found on your network.");
+    console.error("Make sure ADB debugging is enabled on your TV:");
+    console.error("  Settings → Developer Options → Network Debugging → ON");
+    process.exit(1);
+  }
+
+  const ip = found[0];
+  const port = "5555";
+
+  // Save to config
+  saveConfig(ip, port);
+
+  // Also connect via adb
+  adbRaw(`connect ${ip}:${port}`);
+
+  console.log(`✅ Found TV at ${ip} — saved to ~/.clawtv/config.json`);
+
+  if (found.length > 1) {
+    console.log(`\nAlso found: ${found.slice(1).join(", ")}`);
+    console.log(`To use a different one, edit ~/.clawtv/config.json`);
+  }
+
+  console.log(`\nYou're good to go. Try: clawtv screenshot`);
 }
 
 function cmdScreenshot() {
@@ -313,7 +391,8 @@ function cmdHelp() {
 clawtv — Control your Android TV with Claude Code
 
 Commands:
-  clawtv scan                    Find your TV on the network
+  clawtv setup                   Auto-find your TV and save config
+  clawtv scan                    Find TVs on the network (discovery only)
   clawtv connect                 Connect via ADB
   clawtv screenshot              Capture TV screen → ~/.clawtv/screen.png
   clawtv press <key> [times]     Send remote button press
@@ -335,7 +414,8 @@ Known apps:
   plex  spotify  peacock  paramount  settings  home
 
 Setup:
-  export CLAWTV_IP=<your-tv-ip>    (add to ~/.zshrc)
+  npm install -g clawtv
+  clawtv setup                   # auto-finds and saves your TV
 
 Docs: https://github.com/phatstraw/clawtv
 `);
@@ -345,6 +425,7 @@ Docs: https://github.com/phatstraw/clawtv
 const [, , cmd, ...args] = process.argv;
 
 const COMMANDS = {
+  setup: () => cmdSetup(),
   scan: () => cmdScan(),
   connect: () => cmdConnect(),
   screenshot: () => cmdScreenshot(),
@@ -358,9 +439,7 @@ const COMMANDS = {
   vol: () => cmdVolume(args),
   power: () => cmdPower(args),
   push: () => {
-    /* TODO: implement push in node */ console.log(
-      "Use: adb push <file> /sdcard/Movies/",
-    );
+    console.log("Use: adb push <file> /sdcard/Movies/");
   },
   wait: () => cmdWait(args),
   state: () => cmdState(),
@@ -368,12 +447,19 @@ const COMMANDS = {
   help: () => cmdHelp(),
 };
 
-if (!cmd || cmd === "--help" || cmd === "-h") {
-  cmdHelp();
-} else if (COMMANDS[cmd.toLowerCase()]) {
-  COMMANDS[cmd.toLowerCase()]();
-} else {
-  console.error(`Unknown command: ${cmd}`);
-  console.error(`Run 'clawtv help' for usage.`);
-  process.exit(1);
+async function main() {
+  if (!cmd || cmd === "--help" || cmd === "-h") {
+    cmdHelp();
+  } else if (COMMANDS[cmd.toLowerCase()]) {
+    await COMMANDS[cmd.toLowerCase()]();
+  } else {
+    console.error(`Unknown command: ${cmd}`);
+    console.error(`Run 'clawtv help' for usage.`);
+    process.exit(1);
+  }
 }
+
+main().catch((err) => {
+  console.error("Error:", err.message);
+  process.exit(1);
+});
