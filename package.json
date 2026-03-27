@@ -1,12 +1,13 @@
 {
   "name": "clawtv",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Control your Android TV with Claude Code. Stop Googling what app your show is on.",
   "bin": {
     "clawtv": "./clawtv.js"
   },
   "scripts": {
-    "test": "node clawtv.js state"
+    "test": "node --test clawtv.test.js",
+    "test:smoke": "node clawtv.js state"
   },
   "keywords": [
     "android-tv",

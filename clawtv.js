@@ -21,7 +21,7 @@
  *   clawtv state
  */
 
-const { execSync, spawnSync } = require("child_process");
+const { execSync } = require("child_process");
 const net = require("net");
 const fs = require("fs");
 const os = require("os");
@@ -206,16 +206,49 @@ function fastScan(subnet) {
   });
 }
 
+// ── Connection check ──────────────────────────────────────────────────────
+function ensureConnected() {
+  const target = getTarget();
+  const out = adbRaw("devices");
+  const lines = out
+    .split("\n")
+    .filter(
+      (l) => l.includes(target) && (l.includes("device") && !l.includes("offline")),
+    );
+  if (lines.length > 0) return true;
+
+  // Try to reconnect
+  console.log(`Reconnecting to ${target}...`);
+  const connectOut = adbRaw(`connect ${target}`);
+  if (
+    connectOut.includes("connected to") ||
+    connectOut.includes("already connected")
+  ) {
+    return true;
+  }
+  console.error(`❌ Cannot reach TV at ${target}`);
+  console.error(`   ${connectOut.trim()}`);
+  console.error("   Is the TV on? Try: clawtv setup");
+  process.exit(1);
+}
+
 // ── Commands ───────────────────────────────────────────────────────────────
 function cmdConnect() {
   if (!TV_IP) {
-    console.log("No CLAWTV_IP set. Run: clawtv setup");
-    return;
+    console.error("❌ No TV configured. Run: clawtv setup");
+    process.exit(1);
   }
   const target = `${TV_IP}:${TV_PORT}`;
   console.log(`Connecting to ${target}...`);
   const out = adbRaw(`connect ${target}`);
-  console.log(out.trim());
+  const ok = out.includes("connected to") || out.includes("already connected");
+  if (ok) {
+    console.log(`✅ Connected to ${target}`);
+  } else {
+    console.error(`❌ Connection failed: ${out.trim()}`);
+    console.error("   Is the TV on? Is network debugging enabled?");
+    process.exit(1);
+  }
 }
 
 async function cmdScan() {
@@ -267,21 +300,40 @@ async function cmdSetup() {
 
   // Save to config
   saveConfig(ip, port);
-
-  // Also connect via adb
-  adbRaw(`connect ${ip}:${port}`);
-
   console.log(`✅ Found TV at ${ip} — saved to ~/.clawtv/config.json`);
+
+  // Connect via adb and verify
+  const connectOut = adbRaw(`connect ${ip}:${port}`);
+  const connectOk =
+    connectOut.includes("connected to") || connectOut.includes("already connected");
+  if (connectOk) {
+    console.log(`✅ ADB connected to ${ip}:${port}`);
+  } else {
+    console.error(`⚠️  ADB connect failed: ${connectOut.trim()}`);
+    console.error(
+      "   The TV was found on the network but ADB could not connect.",
+    );
+    console.error(
+      "   Check that 'Network debugging' is enabled in Developer Options.",
+    );
+    console.error("   You may need to accept the debug prompt on the TV.");
+  }
 
   if (found.length > 1) {
     console.log(`\nAlso found: ${found.slice(1).join(", ")}`);
     console.log(`To use a different one, edit ~/.clawtv/config.json`);
   }
 
-  console.log(`\nYou're good to go. Try: clawtv screenshot`);
+  if (connectOk) {
+    console.log(`\nYou're good to go. Try: clawtv screenshot`);
+  }
 }
 
 function cmdScreenshot() {
+  ensureConnected();
+  // Remove stale screenshot so we can detect failure
+  if (fs.existsSync(SCREEN_PATH)) fs.unlinkSync(SCREEN_PATH);
+
   const capResult = adb("shell screencap -p /sdcard/_clawtv.png");
   const pullResult = adb(`pull /sdcard/_clawtv.png "${SCREEN_PATH}"`);
   if (!fs.existsSync(SCREEN_PATH)) {
@@ -298,13 +350,17 @@ function cmdScreenshot() {
   console.log(`View: ${SCREEN_PATH}`);
 }
 
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
 function cmdPress(args) {
   const key = (args[0] || "select").toLowerCase().replace(/\s+/g, "_");
   const times = parseInt(args[1] || "1", 10);
   const code = KEY_MAP[key] !== undefined ? KEY_MAP[key] : key;
   for (let i = 0; i < times; i++) {
     adb(`shell input keyevent ${code}`);
-    if (times > 1 && i < times - 1) execSync("sleep 0.15");
+    if (times > 1 && i < times - 1) sleepSync(150);
   }
   console.log(`Pressed ${key} ×${times}`);
 }
@@ -362,7 +418,7 @@ function cmdVolume(args) {
   const key = action === "up" ? 24 : 25;
   for (let i = 0; i < steps; i++) {
     adb(`shell input keyevent ${key}`);
-    if (i < steps - 1) execSync("sleep 0.1");
+    if (i < steps - 1) sleepSync(100);
   }
   console.log(`Volume ${action} ×${steps}`);
 }
@@ -376,7 +432,7 @@ function cmdPower(args) {
 
 function cmdWait(args) {
   const secs = parseFloat(args[0] || "1.5");
-  execSync(`sleep ${secs}`);
+  sleepSync(Math.round(secs * 1000));
   console.log(`Waited ${secs}s`);
 }
 
@@ -428,6 +484,28 @@ Docs: https://github.com/phatstraw/clawtv
 `);
 }
 
+function cmdPush(args) {
+  if (args.length === 0) {
+    console.error("Usage: clawtv push <local_path> [remote_path]");
+    console.error("  Default remote path: /sdcard/Download/");
+    process.exit(1);
+  }
+  ensureConnected();
+  const localPath = args[0];
+  const remotePath = args[1] || "/sdcard/Download/";
+  if (!fs.existsSync(localPath)) {
+    console.error(`❌ File not found: ${localPath}`);
+    process.exit(1);
+  }
+  const out = adb(`push "${localPath}" "${remotePath}"`);
+  if (out.includes("error") || out.includes("failed")) {
+    console.error(`❌ Push failed: ${out.trim()}`);
+    process.exit(1);
+  }
+  console.log(`Pushed ${localPath} → ${remotePath}`);
+  console.log(out.trim());
+}
+
 // ── Router ─────────────────────────────────────────────────────────────────
 const [, , cmd, ...args] = process.argv;
 
@@ -445,9 +523,7 @@ const COMMANDS = {
   volume: () => cmdVolume(args),
   vol: () => cmdVolume(args),
   power: () => cmdPower(args),
-  push: () => {
-    console.log("Use: adb push <file> /sdcard/Movies/");
-  },
+  push: () => cmdPush(args),
   wait: () => cmdWait(args),
   state: () => cmdState(),
   status: () => cmdState(),
@@ -466,7 +542,46 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error("Error:", err.message);
-  process.exit(1);
-});
+// Only run CLI when executed directly (not when required for testing)
+if (require.main === module) {
+  main().catch((err) => {
+    console.error("Error:", err.message);
+    process.exit(1);
+  });
+}
+
+// ── Exports for testing ───────────────────────────────────────────────────
+module.exports = {
+  loadConfig,
+  saveConfig,
+  getLocalSubnet,
+  getTarget,
+  resolveActivity,
+  ensureConnected,
+  fastScan,
+  sleep,
+  sleepSync,
+  adb,
+  adbRaw,
+  cmdConnect,
+  cmdScan,
+  cmdSetup,
+  cmdScreenshot,
+  cmdPress,
+  cmdLaunch,
+  cmdType,
+  cmdVolume,
+  cmdPower,
+  cmdWait,
+  cmdState,
+  cmdPush,
+  cmdHelp,
+  KEY_MAP,
+  KNOWN_APPS,
+  COMMANDS,
+  CONFIG_DIR,
+  CONFIG_FILE,
+  SCREEN_PATH,
+  TV_IP,
+  TV_PORT,
+};
